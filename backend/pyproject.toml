@@ -43,5 +43,7 @@ ignore_missing_imports = true
 
 # --- pytest ---
 [tool.pytest.ini_options]
+[tool.hatch.build.targets.wheel]
+packages = ["src"]
 asyncio_mode = "auto"            # all async test functions run automatically
 testpaths = ["tests"]
