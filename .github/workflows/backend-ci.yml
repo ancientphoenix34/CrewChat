@@ -1,0 +1,64 @@
+name: Backend CI
+
+on:
+  push:
+    paths:
+      - "backend/**"        # only runs when backend files change — Node parallel: same as turborepo's --filter flag
+  pull_request:
+    paths:
+      - "backend/**"
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    services:
+      # Spin up a real Postgres container for tests — no mocking the DB.
+      # Node parallel: same as adding a `services:` block in any Node CI workflow.
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: worktalk
+          POSTGRES_PASSWORD: worktalk
+          POSTGRES_DB: worktalk_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-retries 5
+
+    defaults:
+      run:
+        working-directory: backend   # all steps run inside backend/ automatically
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3   # official uv action — like actions/setup-node for npm
+
+      - name: Install dependencies
+        run: uv sync --frozen          # like npm ci — installs exact versions from lockfile
+
+      - name: Lint
+        run: uv run ruff check src/    # like npm run lint
+
+      - name: Format check
+        run: uv run ruff format --check src/
+
+      - name: Type check
+        run: uv run mypy src/          # like npm run typecheck
+
+      - name: Run tests
+        env:
+          DATABASE_URL: postgresql+asyncpg://worktalk:worktalk@localhost:5432/worktalk_test
+          APP_ENV: test
+          SECRET_KEY: test-secret-key-not-used-in-prod
+          FRONTEND_ORIGIN: http://localhost:5173
+        run: uv run pytest             # like npm test

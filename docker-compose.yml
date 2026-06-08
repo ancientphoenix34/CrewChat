@@ -1,0 +1,31 @@
+services:
+
+  postgres:
+    image: pgvector/pgvector:pg16   # Postgres 16 with pgvector pre-installed (for AI features later)
+    container_name: worktalk_postgres
+    environment:
+      POSTGRES_USER: worktalk
+      POSTGRES_PASSWORD: worktalk
+      POSTGRES_DB: worktalk
+    ports:
+      - "5432:5432"                 # host:container — same port mapping as any Docker tutorial
+    volumes:
+      - postgres_data:/var/lib/postgresql/data  # persist data between restarts (like a named volume in any Node project)
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U worktalk"]
+      interval: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine           # lightweight Redis — used in Phase 2 for WebSocket pub/sub
+    container_name: worktalk_redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+
+# Named volumes — Docker manages where these actually live on disk.
+# Node parallel: same concept in any docker-compose.yml you've written before.
+volumes:
+  postgres_data:
+  redis_data:

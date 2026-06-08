@@ -1,0 +1,47 @@
+[project]
+name = "worktalk-backend"
+version = "0.1.0"
+requires-python = ">=3.11"
+dependencies = [
+    # The web framework — like express/fastify
+    "fastapi>=0.115.0",
+    # The ASGI server — like running `node server.js`
+    "uvicorn[standard]>=0.30.0",
+    # Validated env vars at startup — like dotenv + zod for process.env
+    "pydantic-settings>=2.4.0",
+]
+
+[dependency-groups]
+dev = [
+    # Test runner — like jest
+    "pytest>=8.3.0",
+    # Async test support — needed because our routes are async def
+    "pytest-asyncio>=0.24.0",
+    # HTTP test client — like supertest
+    "httpx>=0.27.0",
+    # Type checker — like tsc --strict
+    "mypy>=1.11.0",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+# --- ruff: linter + formatter (replaces eslint + prettier) ---
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP"]   # errors, pyflakes, import sorting, modernize
+
+# --- mypy: type checker (like tsc --strict) ---
+[tool.mypy]
+python_version = "3.11"
+strict = true
+ignore_missing_imports = true
+
+# --- pytest ---
+[tool.pytest.ini_options]
+asyncio_mode = "auto"            # all async test functions run automatically
+testpaths = ["tests"]
