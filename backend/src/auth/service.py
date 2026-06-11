@@ -3,7 +3,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select
 
 from src.auth.models import OrgRole, Organization, OrganizationMember, User
-from src.auth.schemas import AuthResponse, RegisterOrgRequest
+from src.auth.schemas import AuthResponse, OrganizationPublic, RegisterOrgRequest, UserPublic
 from src.auth.utils import create_access_token, hash_password
 
 
@@ -15,10 +15,8 @@ async def register_org(
     # 1. Check email isn't already taken — DB constraint would catch it too,
     #    but we give a nicer error message here.
     # Node parallel: prisma.user.findUnique({ where: { email } })
-    existing = await session.exec(  # type: ignore[attr-defined]
-        select(User).where(User.email == data.email)
-    )
-    if existing.first():
+    result = await session.execute(select(User).where(User.email == data.email))
+    if result.scalar_one_or_none():
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="An account with this email already exists",
@@ -68,7 +66,6 @@ async def register_org(
         role=OrgRole.OWNER.value,
     )
 
-    from src.auth.schemas import OrganizationPublic, UserPublic
     return AuthResponse(
         access_token=token,
         user=UserPublic.model_validate(user),

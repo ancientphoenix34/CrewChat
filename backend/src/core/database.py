@@ -11,6 +11,7 @@ engine = create_async_engine(
     settings.database_url,
     echo=settings.app_env == "development",
     future=True,
+    connect_args={"statement_cache_size": 0},
 )
 
 # async_sessionmaker is a factory that produces sessions.

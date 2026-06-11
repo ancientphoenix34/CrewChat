@@ -9,11 +9,13 @@ dependencies = [
     "uvicorn[standard]>=0.30.0",
     # Validated env vars at startup — like dotenv + zod for process.env
     "pydantic-settings>=2.4.0",
+    "pydantic[email]>=2.0.0",
     "sqlmodel>=0.0.21",           # ORM — like Prisma
     "asyncpg>=0.29.0",            # async Postgres driver
     "alembic>=1.13.0",            # migrations — like Prisma Migrate
     "python-jose[cryptography]>=3.3.0",  # JWT — like jsonwebtoken
     "passlib[bcrypt]>=1.7.4",     # password hashing — like bcrypt (npm)
+    "bcrypt>=3.2.0,<4.0.0",
 ]
 
 [dependency-groups]
