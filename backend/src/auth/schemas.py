@@ -59,3 +59,13 @@ class AuthResponse(SQLModel):
     token_type: str = "bearer"   # OAuth2 convention — always "bearer"
     user: UserPublic
     organization: OrganizationPublic
+
+
+class LoginRequest(SQLModel):
+    email: EmailStr
+    password: str
+
+    @field_validator("email")
+    @classmethod
+    def normalize_email(cls, v: str) -> str:
+        return v.lower().strip()

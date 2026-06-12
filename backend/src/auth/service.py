@@ -3,8 +3,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select
 
 from src.auth.models import OrgRole, Organization, OrganizationMember, User
-from src.auth.schemas import AuthResponse, OrganizationPublic, RegisterOrgRequest, UserPublic
-from src.auth.utils import create_access_token, hash_password
+from src.auth.schemas import AuthResponse, LoginRequest, OrganizationPublic, RegisterOrgRequest, UserPublic
+from src.auth.utils import create_access_token, hash_password, verify_password
 
 
 async def register_org(
@@ -71,3 +71,58 @@ async def register_org(
         user=UserPublic.model_validate(user),
         organization=OrganizationPublic.model_validate(org),
     )
+
+
+async def login(
+    data: LoginRequest,
+    session: AsyncSession,
+) -> AuthResponse:
+
+    # 1. Find user by email
+    result = await session.execute(select(User).where(User.email == data.email))
+    user = result.scalar_one_or_none()
+
+    # Generic error — never reveal whether email exists or not (security)
+    if not user or not verify_password(data.password, user.hashed_password):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid email or password",
+        )
+
+    if not user.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Account has been deactivated",
+        )
+
+    # 2. Get their org membership (first org they belong to)
+    membership_result = await session.execute(
+        select(OrganizationMember).where(OrganizationMember.user_id == user.id)
+    )
+    membership = membership_result.scalar_one_or_none()
+
+    if not membership:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="User has no organization",
+        )
+
+    # 3. Load the org
+    org_result = await session.execute(
+        select(Organization).where(Organization.id == membership.org_id)
+    )
+    org = org_result.scalar_one_or_none()
+
+    # 4. Issue JWT
+    token = create_access_token(
+        user_id=user.id,
+        org_id=org.id,
+        role=membership.role.value,
+    )
+
+    return AuthResponse(
+        access_token=token,
+        user=UserPublic.model_validate(user),
+        organization=OrganizationPublic.model_validate(org),
+    )
+

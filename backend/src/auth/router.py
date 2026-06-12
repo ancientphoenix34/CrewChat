@@ -3,8 +3,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.auth.dependencies import get_current_user
 from src.auth.models import User
-from src.auth.schemas import AuthResponse, RegisterOrgRequest, UserPublic
-from src.auth.service import register_org
+from src.auth.schemas import AuthResponse, LoginRequest, RegisterOrgRequest, UserPublic
+from src.auth.service import login, register_org
 from src.core.database import get_session
 
 # APIRouter is like Express's Router — a mini-app you mount onto the main app.
@@ -28,6 +28,14 @@ async def register_org_endpoint(
     #   res.status(201).json(result)
     # })
     return await register_org(data, session)
+
+@router.post("/login", response_model=AuthResponse)
+async def login_endpoint(
+    data: LoginRequest,
+    session: AsyncSession = Depends(get_session),
+) -> AuthResponse:
+    return await login(data, session)
+
 
 
 @router.get("/me", response_model=UserPublic)
