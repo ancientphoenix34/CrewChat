@@ -4,6 +4,7 @@ from pydantic import EmailStr, field_validator
 from sqlmodel import SQLModel
 
 from src.auth.models import OrgRole
+from datetime import datetime
 
 
 # ── Input schemas (what the API receives) ────────────────────────────────────
@@ -69,3 +70,35 @@ class LoginRequest(SQLModel):
     @classmethod
     def normalize_email(cls, v: str) -> str:
         return v.lower().strip()
+    
+
+class InviteRequest(SQLModel):
+    email: EmailStr
+    role: OrgRole = OrgRole.MEMBER
+
+    @field_validator("email")
+    @classmethod
+    def normalize_email(cls, v: str) -> str:
+        return v.lower().strip()
+
+
+class AcceptInviteRequest(SQLModel):
+    token: str
+    display_name: str
+    password: str
+
+    @field_validator("password")
+    @classmethod
+    def validate_password(cls, v: str) -> str:
+        if len(v) < 8:
+            raise ValueError("Password must be at least 8 characters")
+        return v
+
+
+class InvitePublic(SQLModel):
+    id: UUID
+    email: str
+    role: OrgRole
+    expires_at: datetime
+    is_used: bool
+

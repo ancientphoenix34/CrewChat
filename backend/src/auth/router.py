@@ -1,9 +1,19 @@
 from fastapi import APIRouter, Depends, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.auth.dependencies import get_current_user
-from src.auth.models import User
-from src.auth.schemas import AuthResponse, LoginRequest, RegisterOrgRequest, UserPublic
+from src.auth.dependencies import get_current_user, require_org_role
+from src.auth.models import OrgRole, OrganizationMember, User
+from src.auth.schemas import (
+    AcceptInviteRequest,
+    AuthResponse,
+    InvitePublic,
+    InviteRequest,
+    LoginRequest,
+    RegisterOrgRequest,
+    UserPublic,
+)
+from src.auth.service import accept_invite, create_invite, login, register_org
+from src.core.database import get_session
 from src.auth.service import login, register_org
 from src.core.database import get_session
 
@@ -44,3 +54,22 @@ async def get_me(
 ) -> UserPublic:
     # Node parallel: router.get('/me', authMiddleware, (req, res) => res.json(req.user))
     return UserPublic.model_validate(current_user)
+
+
+@router.post("/invite", response_model=InvitePublic, status_code=status.HTTP_201_CREATED)
+async def invite_member(
+    data: InviteRequest,
+    current_user: User = Depends(get_current_user),
+    membership: OrganizationMember = Depends(require_org_role(OrgRole.ADMIN)),
+    session: AsyncSession = Depends(get_session),
+) -> InvitePublic:
+    return await create_invite(data, current_user, membership, session)
+
+
+@router.post("/accept-invite", response_model=AuthResponse)
+async def accept_invite_endpoint(
+    data: AcceptInviteRequest,
+    session: AsyncSession = Depends(get_session),
+) -> AuthResponse:
+    return await accept_invite(data, session)
+

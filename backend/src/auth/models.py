@@ -81,3 +81,18 @@ class OrganizationMember(SQLModel, table=True):
     # Relationships let you do member.user and member.organization
     user: User | None = Relationship(back_populates="org_memberships")
     organization: Organization | None = Relationship(back_populates="members")
+
+
+class OrgInvite(SQLModel, table=True):
+    __tablename__ = "org_invites"
+
+    id: UUID = Field(default_factory=uuid4, primary_key=True)
+    org_id: UUID = Field(foreign_key="organizations.id", index=True)
+    invited_by: UUID = Field(foreign_key="users.id")
+    email: str = Field(index=True)
+    role: OrgRole = Field(default=OrgRole.MEMBER)
+    token: str = Field(unique=True, index=True)
+    expires_at: datetime
+    is_used: bool = Field(default=False)
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+

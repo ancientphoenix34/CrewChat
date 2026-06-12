@@ -71,10 +71,11 @@ def require_org_role(minimum_role: OrgRole):
     ) -> OrganizationMember:
         # Node parallel: checking req.user.role >= requiredRole
         statement = select(OrganizationMember).where(
-            OrganizationMember.user_id == current_user.id
+        OrganizationMember.user_id == current_user.id
         )
-        result = await session.exec(statement)  # type: ignore[attr-defined]
-        membership = result.first()
+        result = await session.execute(statement)
+        membership = result.scalars().first()
+
 
         role_hierarchy = [OrgRole.MEMBER, OrgRole.MANAGER, OrgRole.ADMIN, OrgRole.OWNER]
 

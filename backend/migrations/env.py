@@ -43,7 +43,7 @@ async def run_async_migrations() -> None:
         config.get_section(config.config_ini_section, {}),
         prefix="sqlalchemy.",
         poolclass=NullPool,
-        connect_args={"prepared_statement_cache_size": 0},  # add this
+        connect_args={"statement_cache_size": 0},
     )
     async with connectable.connect() as connection:
         await connection.run_sync(do_run_migrations)

@@ -1,9 +1,13 @@
+import secrets
+from datetime import datetime, timedelta
+
 from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select
 
-from src.auth.models import OrgRole, Organization, OrganizationMember, User
-from src.auth.schemas import AuthResponse, LoginRequest, OrganizationPublic, RegisterOrgRequest, UserPublic
+
+from src.auth.models import OrgRole, Organization, OrganizationMember, User, OrgInvite
+from src.auth.schemas import AuthResponse, LoginRequest, OrganizationPublic, RegisterOrgRequest, UserPublic, AcceptInviteRequest,  InvitePublic, InviteRequest
 from src.auth.utils import create_access_token, hash_password, verify_password
 
 
@@ -125,4 +129,100 @@ async def login(
         user=UserPublic.model_validate(user),
         organization=OrganizationPublic.model_validate(org),
     )
+
+
+
+async def create_invite(
+    data: InviteRequest,
+    current_user: User,
+    membership: OrganizationMember,
+    session: AsyncSession,
+) -> InvitePublic:
+    # Prevent duplicate pending invites for the same email in the same org
+    existing = await session.execute(
+        select(OrgInvite).where(
+            OrgInvite.org_id == membership.org_id,
+            OrgInvite.email == data.email,
+            OrgInvite.is_used == False,
+        )
+    )
+    if existing.scalar_one_or_none():
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="An active invite for this email already exists",
+        )
+
+    invite = OrgInvite(
+        org_id=membership.org_id,
+        invited_by=current_user.id,
+        email=data.email,
+        role=data.role,
+        token=secrets.token_urlsafe(32),
+        expires_at=datetime.utcnow() + timedelta(days=7),
+    )
+    session.add(invite)
+    await session.commit()
+    await session.refresh(invite)
+    return InvitePublic.model_validate(invite)
+
+
+async def accept_invite(data: AcceptInviteRequest, session: AsyncSession) -> AuthResponse:
+    result = await session.execute(
+        select(OrgInvite).where(OrgInvite.token == data.token)
+    )
+    invite = result.scalar_one_or_none()
+
+    # One generic error covers: wrong token, already used, expired
+    if not invite or invite.is_used or invite.expires_at < datetime.utcnow():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid or expired invitation",
+        )
+
+    existing_user = await session.execute(
+        select(User).where(User.email == invite.email)
+    )
+    if existing_user.scalar_one_or_none():
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="An account with this email already exists",
+        )
+
+    user = User(
+        email=invite.email,
+        hashed_password=hash_password(data.password),
+        display_name=data.display_name,
+    )
+    session.add(user)
+    await session.flush()
+
+    new_membership = OrganizationMember(
+        user_id=user.id,
+        org_id=invite.org_id,
+        role=invite.role,
+    )
+    session.add(new_membership)
+
+    invite.is_used = True
+    session.add(invite)
+
+    await session.commit()
+    await session.refresh(user)
+
+    org_result = await session.execute(
+        select(Organization).where(Organization.id == invite.org_id)
+    )
+    org = org_result.scalar_one_or_none()
+
+    token = create_access_token(
+        user_id=user.id,
+        org_id=org.id,
+        role=invite.role.value,
+    )
+    return AuthResponse(
+        access_token=token,
+        user=UserPublic.model_validate(user),
+        organization=OrganizationPublic.model_validate(org),
+    )
+
 
