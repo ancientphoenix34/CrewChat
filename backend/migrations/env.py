@@ -6,7 +6,9 @@ from sqlalchemy.ext.asyncio import async_engine_from_config
 from sqlalchemy.pool import NullPool
 from sqlmodel import SQLModel
 
-import src.auth.models  # noqa: F401
+import src.auth.models
+import src.channels.models
+import src.channels.models
 
 from src.core.config import settings
 

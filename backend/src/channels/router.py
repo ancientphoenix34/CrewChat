@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.auth.dependencies import get_current_user, require_org_role
 from src.auth.models import OrgRole, OrganizationMember, User
 from src.channels import service
-from src.channels.schemas import ChannelListResponse, ChannelPublic, CreateChannelRequest
+from src.channels.schemas import ChannelListResponse, ChannelPublic, CreateChannelRequest, MessageListResponse, MessagePublic, SendMessageRequest
 from src.core.database import get_session
 
 router = APIRouter(prefix="/channels", tags=["channels"])
@@ -67,3 +67,26 @@ async def delete_channel(
     session: AsyncSession = Depends(get_session),
 ) -> None:
     await service.delete_channel(channel_id, membership, session)
+
+
+@router.post("/{channel_id}/messages", response_model=MessagePublic, status_code=status.HTTP_201_CREATED)
+async def send_message(
+    channel_id: UUID,
+    data: SendMessageRequest,
+    current_user: User = Depends(get_current_user),
+    membership: OrganizationMember = Depends(require_org_role(OrgRole.MEMBER)),
+    session: AsyncSession = Depends(get_session),
+) -> MessagePublic:
+    return await service.send_message(channel_id, data, current_user, membership, session)
+
+
+@router.get("/{channel_id}/messages", response_model=MessageListResponse)
+async def list_messages(
+    channel_id: UUID,
+    before: str | None = None,
+    limit: int = 50,
+    current_user: User = Depends(get_current_user),
+    membership: OrganizationMember = Depends(require_org_role(OrgRole.MEMBER)),
+    session: AsyncSession = Depends(get_session),
+) -> MessageListResponse:
+    return await service.list_messages(channel_id, current_user, membership, session, before, limit)

@@ -26,3 +26,14 @@ class ChannelMember(SQLModel, table=True):
     joined_at: datetime = Field(default_factory=datetime.utcnow)
 
     channel: Channel | None = Relationship(back_populates="members")
+
+
+class Message(SQLModel, table=True):
+    __tablename__ = "messages"
+
+    id: UUID = Field(default_factory=uuid4, primary_key=True)
+    channel_id: UUID = Field(foreign_key="channels.id", index=True)
+    sender_id: UUID = Field(foreign_key="users.id", index=True)
+    content: str
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+

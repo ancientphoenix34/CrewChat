@@ -35,3 +35,31 @@ class ChannelPublic(SQLModel):
 
 class ChannelListResponse(SQLModel):
     channels: list[ChannelPublic]
+
+
+
+
+class SendMessageRequest(SQLModel):
+    content: str
+
+    @field_validator("content")
+    @classmethod
+    def content_not_empty(cls, v: str) -> str:
+        v = v.strip()
+        if not v:
+            raise ValueError("Message content cannot be empty")
+        return v
+
+
+class MessagePublic(SQLModel):
+    id: UUID
+    channel_id: UUID
+    sender_id: UUID
+    content: str
+    created_at: datetime
+
+
+class MessageListResponse(SQLModel):
+    messages: list[MessagePublic]
+    next_cursor: str | None  # for pagination
+

@@ -3,10 +3,11 @@ from uuid import UUID
 from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import or_, select
+import base64
 
 from src.auth.models import OrganizationMember, User
-from src.channels.models import Channel, ChannelMember
-from src.channels.schemas import ChannelListResponse, ChannelPublic, CreateChannelRequest
+from src.channels.models import Channel, ChannelMember, Message
+from src.channels.schemas import ChannelListResponse, ChannelPublic, CreateChannelRequest, MessageListResponse, MessagePublic, SendMessageRequest
 
 
 async def create_channel(
@@ -135,3 +136,77 @@ async def delete_channel(
 
     await session.delete(channel)
     await session.commit()
+
+
+async def send_message(
+    channel_id: UUID,
+    data: SendMessageRequest,
+    current_user: User,
+    membership: OrganizationMember,
+    session: AsyncSession,
+) -> MessagePublic:
+    channel = await session.get(Channel, channel_id)
+    if not channel or channel.org_id != membership.org_id:
+        raise HTTPException(status_code=404, detail="Channel not found")
+
+    # Private channels: must be a member
+    if channel.is_private:
+        member = await session.get(ChannelMember, (channel_id, current_user.id))
+        if not member:
+            raise HTTPException(status_code=403, detail="Access denied")
+
+    message = Message(
+        channel_id=channel_id,
+        sender_id=current_user.id,
+        content=data.content,
+    )
+    session.add(message)
+    await session.commit()
+    await session.refresh(message)
+    return MessagePublic.model_validate(message)
+
+
+async def list_messages(
+    channel_id: UUID,
+    current_user: User,
+    membership: OrganizationMember,
+    session: AsyncSession,
+    before: str | None = None,  # cursor
+    limit: int = 50,
+) -> MessageListResponse:
+    channel = await session.get(Channel, channel_id)
+    if not channel or channel.org_id != membership.org_id:
+        raise HTTPException(status_code=404, detail="Channel not found")
+
+    if channel.is_private:
+        member = await session.get(ChannelMember, (channel_id, current_user.id))
+        if not member:
+            raise HTTPException(status_code=403, detail="Access denied")
+
+    query = (
+        select(Message)
+        .where(Message.channel_id == channel_id)
+        .order_by(Message.created_at.desc())
+        .limit(limit + 1)   # fetch one extra to know if there's a next page
+    )
+
+    if before:
+        # decode cursor → datetime, filter messages older than that
+        cursor_dt = datetime.fromisoformat(
+            base64.b64decode(before.encode()).decode()
+        )
+        query = query.where(Message.created_at < cursor_dt)
+
+    result = await session.execute(query)
+    messages = result.scalars().all()
+
+    next_cursor = None
+    if len(messages) > limit:
+        messages = messages[:limit]
+        oldest = messages[-1]
+        next_cursor = base64.b64encode(oldest.created_at.isoformat().encode()).decode()
+
+    return MessageListResponse(
+        messages=[MessagePublic.model_validate(m) for m in reversed(messages)],
+        next_cursor=next_cursor,
+    )
