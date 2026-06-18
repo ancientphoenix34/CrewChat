@@ -9,6 +9,7 @@ from sqlmodel import SQLModel
 import src.auth.models
 import src.channels.models
 import src.channels.models
+import src.dms.models
 
 from src.core.config import settings
 
