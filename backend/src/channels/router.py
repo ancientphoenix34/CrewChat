@@ -1,6 +1,6 @@
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, WebSocket, WebSocketDisconnect, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.auth.dependencies import get_current_user, require_org_role
@@ -8,6 +8,7 @@ from src.auth.models import OrgRole, OrganizationMember, User
 from src.channels import service
 from src.channels.schemas import ChannelListResponse, ChannelPublic, CreateChannelRequest, MessageListResponse, MessagePublic, SendMessageRequest
 from src.core.database import get_session
+from src.channels.ws import manager
 
 router = APIRouter(prefix="/channels", tags=["channels"])
 
@@ -90,3 +91,24 @@ async def list_messages(
     session: AsyncSession = Depends(get_session),
 ) -> MessageListResponse:
     return await service.list_messages(channel_id, current_user, membership, session, before, limit)
+
+
+@router.websocket("/{channel_id}/ws")
+async def channel_websocket(
+    channel_id: UUID,
+    token: str,
+    ws: WebSocket,
+) -> None:
+    from src.auth.utils import decode_access_token
+
+    payload = decode_access_token(token)
+    if not payload:
+        await ws.close(code=1008)
+        return
+
+    await manager.connect(str(channel_id), ws)
+    try:
+        while True:
+            await ws.receive_text()
+    except WebSocketDisconnect:
+        manager.disconnect(str(channel_id), ws)

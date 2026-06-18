@@ -8,6 +8,7 @@ import base64
 from src.auth.models import OrganizationMember, User
 from src.channels.models import Channel, ChannelMember, Message
 from src.channels.schemas import ChannelListResponse, ChannelPublic, CreateChannelRequest, MessageListResponse, MessagePublic, SendMessageRequest
+from src.channels.ws import manager
 
 
 async def create_channel(
@@ -163,6 +164,8 @@ async def send_message(
     session.add(message)
     await session.commit()
     await session.refresh(message)
+    payload = MessagePublic.model_validate(message).model_dump(mode="json")
+    await manager.broadcast(str(channel_id), payload)
     return MessagePublic.model_validate(message)
 
 
