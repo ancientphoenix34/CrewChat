@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, status
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlmodel import select
 
 from src.auth.dependencies import get_current_user, require_org_role
 from src.auth.models import OrgRole, OrganizationMember, User
@@ -13,8 +14,6 @@ from src.auth.schemas import (
     UserPublic,
 )
 from src.auth.service import accept_invite, create_invite, login, register_org
-from src.core.database import get_session
-from src.auth.service import login, register_org
 from src.core.database import get_session
 
 # APIRouter is like Express's Router — a mini-app you mount onto the main app.
@@ -72,4 +71,19 @@ async def accept_invite_endpoint(
     session: AsyncSession = Depends(get_session),
 ) -> AuthResponse:
     return await accept_invite(data, session)
+
+
+@router.get("/members", response_model=list[UserPublic])
+async def list_members(
+    current_user: User = Depends(get_current_user),
+    membership: OrganizationMember = Depends(require_org_role(OrgRole.MEMBER)),
+    session: AsyncSession = Depends(get_session),
+) -> list[UserPublic]:
+    result = await session.execute(
+        select(User)
+        .join(OrganizationMember, OrganizationMember.user_id == User.id)
+        .where(OrganizationMember.org_id == membership.org_id)
+        .where(User.id != current_user.id)
+    )
+    return result.scalars().all()
 

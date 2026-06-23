@@ -1,6 +1,7 @@
 import { Routes, Route } from 'react-router-dom'
 import Sidebar from '../components/Sidebar'
 import ChannelView from '../components/ChannelView'
+import DMView from '../components/DMView'
 import { useAuthStore } from '../store/auth'
 
 function WelcomePanel() {
@@ -25,6 +26,7 @@ export default function ChatPage() {
       <div className="flex-1 overflow-hidden">
         <Routes>
           <Route path="channels/:channelId" element={<ChannelView />} />
+          <Route path="dms/:conversationId" element={<DMView />} />
           <Route path="*" element={<WelcomePanel />} />
         </Routes>
       </div>

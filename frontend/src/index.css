@@ -18,3 +18,10 @@ body {
   width: 100%;
   min-height: 100svh;
 }
+
+.sidebar-scroll {
+  scrollbar-width: none;       /* Firefox */
+}
+.sidebar-scroll::-webkit-scrollbar {
+  display: none;               /* Chrome / Safari / Edge */
+}

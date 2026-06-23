@@ -101,4 +101,5 @@ class InvitePublic(SQLModel):
     role: OrgRole
     expires_at: datetime
     is_used: bool
+    token: str
 
