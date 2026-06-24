@@ -1,4 +1,5 @@
 from uuid import UUID
+from datetime import datetime
 
 from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -6,7 +7,7 @@ from sqlmodel import or_, select
 import base64
 
 from src.auth.models import OrganizationMember, User
-from src.channels.models import Channel, ChannelMember, Message
+from src.channels.models import Channel, ChannelLastRead, ChannelMember, Message
 from src.channels.schemas import ChannelListResponse, ChannelPublic, CreateChannelRequest, MessageListResponse, MessagePublic, SendMessageRequest
 from src.channels.ws import manager
 
@@ -64,9 +65,34 @@ async def list_channels(
         )
     )
     channels = result.scalars().all()
-    return ChannelListResponse(
-        channels=[ChannelPublic.model_validate(c) for c in channels]
-    )
+    items = []
+    for ch in channels:
+         lr = await session.get(ChannelLastRead, (current_user.id, ch.id))
+         last_read_at = lr.last_read_at if lr else datetime(1970, 1, 1)
+ 
+         count_result = await session.execute(
+             select(func.count(Message.id)).where(
+                 Message.channel_id == ch.id,
+                 Message.created_at > last_read_at,
+             )
+         )
+         unread = count_result.scalar_one()
+         items.append(ChannelPublic.model_validate(ch).model_copy(update={'unread_count': unread}))
+ 
+    return ChannelListResponse(channels=items)
+ 
+ 
+async def mark_channel_read(
+     channel_id: UUID,
+     current_user: User,
+     session: AsyncSession,
+ ) -> None:
+     lr = await session.get(ChannelLastRead, (current_user.id, channel_id))
+     if lr:
+         lr.last_read_at = datetime.utcnow()
+     else:
+         session.add(ChannelLastRead(user_id=current_user.id, channel_id=channel_id))
+     await session.commit()
 
 
 async def get_channel(

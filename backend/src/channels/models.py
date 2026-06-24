@@ -37,3 +37,12 @@ class Message(SQLModel, table=True):
     content: str
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
+
+
+class ChannelLastRead(SQLModel, table=True):
+    __tablename__ = "channel_last_reads"
+
+    user_id: UUID = Field(foreign_key="users.id", primary_key=True)
+    channel_id: UUID = Field(foreign_key="channels.id", primary_key=True)
+    last_read_at: datetime = Field(default_factory=datetime.utcnow)
+

@@ -8,7 +8,7 @@ from src.auth.models import OrgRole, OrganizationMember, User
 from src.channels.ws import manager
 from src.core.database import get_session
 from src.dms import service
-from src.dms.schemas import ConversationPublic, DMListResponse, DirectMessagePublic, SendDMRequest
+from src.dms.schemas import ConversationPublic, DMListResponse, DirectMessagePublic, SendDMRequest, ConversationPublic, ConversationListResponse
 
 router = APIRouter(prefix="/dms", tags=["dms"])
 
@@ -73,3 +73,20 @@ async def dm_websocket(
     except WebSocketDisconnect:
         manager.disconnect(str(conversation_id), ws)
 
+
+@router.get("", response_model=ConversationListResponse)
+async def list_conversations(
+     current_user: User = Depends(get_current_user),
+     membership: OrganizationMember = Depends(require_org_role(OrgRole.MEMBER)),
+     session: AsyncSession = Depends(get_session),
+ ) -> ConversationListResponse:
+     return await service.list_conversations(current_user, membership, session)
+
+
+@router.patch("/{conversation_id}/read", status_code=status.HTTP_204_NO_CONTENT)
+async def mark_dm_read(
+     conversation_id: UUID,
+     current_user: User = Depends(get_current_user),
+     session: AsyncSession = Depends(get_session),
+ ) -> None:
+     await service.mark_dm_read(conversation_id, current_user, session)

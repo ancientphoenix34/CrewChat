@@ -22,3 +22,12 @@ class DirectMessage(SQLModel, table=True):
     sender_id: UUID = Field(foreign_key="users.id", index=True)
     content: str
     created_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+
+class DMLastRead(SQLModel, table=True):
+     __tablename__ = "dm_last_reads"
+ 
+     user_id: UUID = Field(foreign_key="users.id", primary_key=True)
+     conversation_id: UUID = Field(foreign_key="conversations.id", primary_key=True)
+     last_read_at: datetime = Field(default_factory=datetime.utcnow)

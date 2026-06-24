@@ -54,6 +54,7 @@ export default function DMView() {
     if (!conversationId) return
     setMessages([])
     setIsTyping(false)
+    api.patch(`/dms/${conversationId}/read`).catch(() => {})
     api.get(`/dms/${conversationId}/messages`).then(r => setMessages(r.data.messages))
   }, [conversationId])
 

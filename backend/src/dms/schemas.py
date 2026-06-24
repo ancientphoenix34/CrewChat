@@ -36,3 +36,14 @@ class DirectMessagePublic(SQLModel):
 class DMListResponse(SQLModel):
     messages: list[DirectMessagePublic]
     next_cursor: str | None
+
+
+class ConversationWithUser(SQLModel):
+     id: UUID
+     other_user_id: UUID
+     other_user_name: str
+     unread_count: int = 0
+ 
+ 
+class ConversationListResponse(SQLModel):
+     conversations: list[ConversationWithUser]

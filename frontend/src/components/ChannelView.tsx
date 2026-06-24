@@ -60,6 +60,7 @@ export default function ChannelView() {
     setMessages([])
     setChannel(null)
     setTypingUsers([])
+    api.patch(`/channels/${channelId}/read`).catch(() => {})
     api.get(`/channels/${channelId}`).then(r => setChannel(r.data))
     api.get(`/channels/${channelId}/messages`).then(r => setMessages(r.data.messages))
     api.get('/auth/members').then(r => {

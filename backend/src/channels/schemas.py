@@ -31,6 +31,7 @@ class ChannelPublic(SQLModel):
     is_private: bool
     created_by: UUID
     created_at: datetime
+    unread_count: int = 0
 
 
 class ChannelListResponse(SQLModel):

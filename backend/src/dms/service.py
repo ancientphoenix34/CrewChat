@@ -4,11 +4,14 @@ from uuid import UUID
 
 from fastapi import HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlmodel import select
+from sqlmodel import or_, select
+from sqlalchemy import func
 
 from src.auth.models import OrganizationMember, User
-from src.dms.models import Conversation, DirectMessage
-from src.dms.schemas import ConversationPublic, DMListResponse, DirectMessagePublic, SendDMRequest
+from src.dms.models import Conversation, DirectMessage, DMLastRead
+from src.dms.schemas import (ConversationListResponse, ConversationPublic, ConversationWithUser,
+     DMListResponse, DirectMessagePublic, SendDMRequest,
+ )
 
 
 async def get_or_create_conversation(
@@ -39,6 +42,63 @@ async def get_or_create_conversation(
         await session.refresh(conv)
 
     return ConversationPublic.model_validate(conv)
+
+
+async def list_conversations(
+     current_user: User,
+     membership: OrganizationMember,
+     session: AsyncSession,
+ ) -> ConversationListResponse:
+     result = await session.execute(
+         select(Conversation).where(
+             Conversation.org_id == membership.org_id,
+             or_(
+                 Conversation.participant_a == current_user.id,
+                 Conversation.participant_b == current_user.id,
+             )
+         ).order_by(Conversation.created_at.desc())
+     )
+     conversations = result.scalars().all()
+ 
+     items = []
+     for conv in conversations:
+         other_id = conv.participant_b if conv.participant_a == current_user.id else conv.participant_a
+         other_user = await session.get(User, other_id)
+         other_name = other_user.display_name if other_user else str(other_id)[:8]
+ 
+         lr = await session.get(DMLastRead, (current_user.id, conv.id))
+         last_read_at = lr.last_read_at if lr else datetime(1970, 1, 1)
+ 
+         count_result = await session.execute(
+             select(func.count(DirectMessage.id)).where(
+                 DirectMessage.conversation_id == conv.id,
+                 DirectMessage.created_at > last_read_at,
+             )
+         )
+         unread = count_result.scalar_one()
+ 
+         items.append(ConversationWithUser(
+             id=conv.id,
+             other_user_id=other_id,
+             other_user_name=other_name,
+             unread_count=unread,
+         ))
+ 
+     return ConversationListResponse(conversations=items)
+ 
+ 
+async def mark_dm_read(
+     conversation_id: UUID,
+     current_user: User,
+     session: AsyncSession,
+ ) -> None:
+     lr = await session.get(DMLastRead, (current_user.id, conversation_id))
+     if lr:
+         lr.last_read_at = datetime.utcnow()
+     else:
+         session.add(DMLastRead(user_id=current_user.id, conversation_id=conversation_id))
+     await session.commit()
+
 
 
 async def send_dm(
