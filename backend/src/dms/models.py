@@ -31,3 +31,10 @@ class DMLastRead(SQLModel, table=True):
      user_id: UUID = Field(foreign_key="users.id", primary_key=True)
      conversation_id: UUID = Field(foreign_key="conversations.id", primary_key=True)
      last_read_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+class DMMessageHide(SQLModel, table=True):
+     __tablename__ = "dm_message_hides"
+ 
+     user_id: UUID = Field(foreign_key="users.id", primary_key=True)
+     message_id: UUID = Field(foreign_key="direct_messages.id", primary_key=True)

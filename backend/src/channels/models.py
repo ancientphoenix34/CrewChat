@@ -46,3 +46,10 @@ class ChannelLastRead(SQLModel, table=True):
     channel_id: UUID = Field(foreign_key="channels.id", primary_key=True)
     last_read_at: datetime = Field(default_factory=datetime.utcnow)
 
+
+class MessageHide(SQLModel, table=True):
+     __tablename__ = "message_hides"
+ 
+     user_id: UUID = Field(foreign_key="users.id", primary_key=True)
+     message_id: UUID = Field(foreign_key="messages.id", primary_key=True)
+

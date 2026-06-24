@@ -54,13 +54,14 @@ export default function ChannelView() {
   const currentUserId = useAuthStore((s) => s.user?.id)
   const currentUserName = useAuthStore((s) => s.user?.display_name)
   const [memberMap, setMemberMap] = useState<Record<string, string>>({})
+  const [menuOpen, setMenuOpen] = useState<string | null>(null)
 
   useEffect(() => {
     if (!channelId) return
     setMessages([])
     setChannel(null)
     setTypingUsers([])
-    api.patch(`/channels/${channelId}/read`).catch(() => {})
+    api.patch(`/channels/${channelId}/read`).catch(() => { })
     api.get(`/channels/${channelId}`).then(r => setChannel(r.data))
     api.get(`/channels/${channelId}/messages`).then(r => setMessages(r.data.messages))
     api.get('/auth/members').then(r => {
@@ -84,6 +85,10 @@ export default function ChannelView() {
         setTimeout(() => {
           setTypingUsers(prev => prev.filter(n => n !== event.display_name))
         }, 3000)
+        return
+      }
+      if (event.type === 'message_deleted') {
+        setMessages(prev => prev.filter(m => m.id !== event.message_id))
         return
       }
       const msg: Message = event
@@ -132,6 +137,18 @@ export default function ChannelView() {
     }
   }
 
+  async function handleDeleteForEveryone(messageId: string) {
+    setMenuOpen(null)
+    await api.delete(`/channels/${channelId}/messages/${messageId}`)
+  }
+
+  async function handleHide(messageId: string) {
+    setMenuOpen(null)
+    await api.post(`/channels/${channelId}/messages/${messageId}/hide`)
+    setMessages(prev => prev.filter(m => m.id !== messageId))
+  }
+
+
   function formatTime(iso: string) {
     return new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
   }
@@ -168,7 +185,7 @@ export default function ChannelView() {
             return (
               <React.Fragment key={msg.id}>
                 {showSeparator && <DateSeparator label={dateLabel(msg.created_at)} />}
-                <div className="flex items-start gap-3 group">
+                <div className="flex items-start gap-3 group relative">
                   <div className="w-8 h-8 rounded-full bg-purple-100 flex items-center justify-center text-purple-700 text-xs font-bold shrink-0 mt-0.5">
                     {(memberMap[msg.sender_id] ?? msg.sender_id)[0].toUpperCase()}
                   </div>
@@ -180,6 +197,32 @@ export default function ChannelView() {
                       <span className="text-xs text-gray-400">{formatTime(msg.created_at)}</span>
                     </div>
                     <p className="text-sm text-gray-700 break-words">{msg.content}</p>
+                  </div>
+                  <div className="absolute right-0 top-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <button
+                      onClick={() => setMenuOpen(prev => prev === msg.id ? null : msg.id)}
+                      className="text-gray-400 hover:text-gray-600 px-2 py-1 text-lg leading-none"
+                    >
+                      ⋯
+                    </button>
+                    {menuOpen === msg.id && (
+                      <div className="absolute right-0 top-6 bg-white shadow-lg rounded-lg py-1 z-10 min-w-[170px] border border-gray-100">
+                        <button
+                          onClick={() => handleHide(msg.id)}
+                          className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                        >
+                          Delete for me
+                        </button>
+                        {isOwn && (
+                          <button
+                            onClick={() => handleDeleteForEveryone(msg.id)}
+                            className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50"
+                          >
+                            Delete for everyone
+                          </button>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </div>
               </React.Fragment>

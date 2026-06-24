@@ -120,3 +120,24 @@ async def channel_websocket(
     except WebSocketDisconnect:
         manager.disconnect(str(channel_id), ws)
 
+
+@router.delete("/{channel_id}/messages/{message_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_message(
+     channel_id: UUID,
+     message_id: UUID,
+     current_user: User = Depends(get_current_user),
+     session: AsyncSession = Depends(get_session),
+ ) -> None:
+     await service.delete_message(message_id, current_user, session)
+ 
+ 
+@router.post("/{channel_id}/messages/{message_id}/hide", status_code=status.HTTP_204_NO_CONTENT)
+async def hide_message(
+     channel_id: UUID,
+     message_id: UUID,
+     current_user: User = Depends(get_current_user),
+     session: AsyncSession = Depends(get_session),
+ ) -> None:
+     await service.hide_message(message_id, current_user, session)
+
+

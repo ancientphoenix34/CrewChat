@@ -8,7 +8,7 @@ from sqlmodel import or_, select
 from sqlalchemy import func
 
 from src.auth.models import OrganizationMember, User
-from src.dms.models import Conversation, DirectMessage, DMLastRead
+from src.dms.models import Conversation, DirectMessage, DMLastRead, DMMessageHide
 from src.dms.schemas import (ConversationListResponse, ConversationPublic, ConversationWithUser,
      DMListResponse, DirectMessagePublic, SendDMRequest,
  )
@@ -149,6 +149,11 @@ async def list_dms(
     query = (
         select(DirectMessage)
         .where(DirectMessage.conversation_id == conversation_id)
+        .where(
+             ~DirectMessage.id.in_(
+                 select(DMMessageHide.message_id).where(DMMessageHide.user_id == current_user.id)
+             )
+         )
         .order_by(DirectMessage.created_at.desc())
         .limit(limit + 1)
     )
@@ -172,3 +177,32 @@ async def list_dms(
         messages=[DirectMessagePublic.model_validate(m) for m in reversed(messages)],
         next_cursor=next_cursor,
     )
+
+async def delete_dm_message(
+     conversation_id: UUID,
+     message_id: UUID,
+     current_user: User,
+     session: AsyncSession,
+ ) -> None:
+     msg = await session.get(DirectMessage, message_id)
+     if not msg or msg.sender_id != current_user.id or msg.conversation_id != conversation_id:
+         raise HTTPException(status_code=403, detail="Cannot delete this message")
+     await session.delete(msg)
+     await session.commit()
+     from src.channels.ws import manager
+     await manager.broadcast(str(conversation_id), {
+         "type": "message_deleted",
+         "message_id": str(message_id),
+     })
+ 
+ 
+async def hide_dm_message(
+     message_id: UUID,
+     current_user: User,
+     session: AsyncSession,
+ ) -> None:
+     existing = await session.get(DMMessageHide, (current_user.id, message_id))
+     if not existing:
+         session.add(DMMessageHide(user_id=current_user.id, message_id=message_id))
+         await session.commit()
+

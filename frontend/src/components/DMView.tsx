@@ -43,6 +43,7 @@ export default function DMView() {
   const [input, setInput] = useState('')
   const [sending, setSending] = useState(false)
   const [isTyping, setIsTyping] = useState(false)
+  const [menuOpen, setMenuOpen] = useState<string | null>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
   const wsRef = useRef<WebSocket | null>(null)
   const typingThrottle = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -67,6 +68,10 @@ export default function DMView() {
       if (event.type === 'typing') {
         setIsTyping(true)
         setTimeout(() => setIsTyping(false), 3000)
+        return
+      }
+      if (event.type === 'message_deleted') {
+        setMessages(prev => prev.filter(m => m.id !== event.message_id))
         return
       }
       const msg: DirectMessage = event
@@ -115,6 +120,17 @@ export default function DMView() {
     }
   }
 
+  async function handleDeleteForEveryone(messageId: string) {
+    setMenuOpen(null)
+    await api.delete(`/dms/${conversationId}/messages/${messageId}`)
+  }
+
+  async function handleHide(messageId: string) {
+    setMenuOpen(null)
+    await api.post(`/dms/${conversationId}/messages/${messageId}/hide`)
+    setMessages(prev => prev.filter(m => m.id !== messageId))
+  }
+
   function formatTime(iso: string) {
     return new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
   }
@@ -151,7 +167,7 @@ export default function DMView() {
             return (
               <React.Fragment key={msg.id}>
                 {showSeparator && <DateSeparator label={dateLabel(msg.created_at)} />}
-                <div className={`flex items-start gap-3 ${isOwn ? 'flex-row-reverse' : ''}`}>
+                <div className={`flex items-start gap-3 relative group ${isOwn ? 'flex-row-reverse' : ''}`}>
                   <div className="w-8 h-8 rounded-full bg-purple-100 flex items-center justify-center text-purple-700 text-xs font-bold shrink-0 mt-0.5">
                     {isOwn ? currentUserName?.[0]?.toUpperCase() : otherName[0]?.toUpperCase()}
                   </div>
@@ -169,6 +185,32 @@ export default function DMView() {
                     }`}>
                       {msg.content}
                     </div>
+                  </div>
+                  <div className={`self-center opacity-0 group-hover:opacity-100 transition-opacity ${isOwn ? 'mr-1' : 'ml-1'}`}>
+                    <button
+                      onClick={() => setMenuOpen(prev => prev === msg.id ? null : msg.id)}
+                      className="text-gray-400 hover:text-gray-600 px-1 text-lg leading-none"
+                    >
+                      ⋯
+                    </button>
+                    {menuOpen === msg.id && (
+                      <div className={`absolute top-0 bg-white shadow-lg rounded-lg py-1 z-10 min-w-[170px] border border-gray-100 ${isOwn ? 'right-10' : 'left-10'}`}>
+                        <button
+                          onClick={() => handleHide(msg.id)}
+                          className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                        >
+                          Delete for me
+                        </button>
+                        {isOwn && (
+                          <button
+                            onClick={() => handleDeleteForEveryone(msg.id)}
+                            className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50"
+                          >
+                            Delete for everyone
+                          </button>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </div>
               </React.Fragment>

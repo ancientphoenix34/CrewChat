@@ -90,3 +90,22 @@ async def mark_dm_read(
      session: AsyncSession = Depends(get_session),
  ) -> None:
      await service.mark_dm_read(conversation_id, current_user, session)
+
+@router.delete("/{conversation_id}/messages/{message_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_dm_message(
+     conversation_id: UUID,
+     message_id: UUID,
+     current_user: User = Depends(get_current_user),
+     session: AsyncSession = Depends(get_session),
+ ) -> None:
+     await service.delete_dm_message(conversation_id, message_id, current_user, session)
+ 
+ 
+@router.post("/{conversation_id}/messages/{message_id}/hide", status_code=status.HTTP_204_NO_CONTENT)
+async def hide_dm_message(
+     conversation_id: UUID,
+     message_id: UUID,
+     current_user: User = Depends(get_current_user),
+     session: AsyncSession = Depends(get_session),
+ ) -> None:
+     await service.hide_dm_message(message_id, current_user, session)

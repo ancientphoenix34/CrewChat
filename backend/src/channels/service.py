@@ -7,7 +7,7 @@ from sqlmodel import or_, select
 import base64
 
 from src.auth.models import OrganizationMember, User
-from src.channels.models import Channel, ChannelLastRead, ChannelMember, Message
+from src.channels.models import Channel, ChannelLastRead, ChannelMember, Message, MessageHide
 from src.channels.schemas import ChannelListResponse, ChannelPublic, CreateChannelRequest, MessageListResponse, MessagePublic, SendMessageRequest
 from src.channels.ws import manager
 
@@ -215,6 +215,11 @@ async def list_messages(
     query = (
         select(Message)
         .where(Message.channel_id == channel_id)
+        .where(
+             ~Message.id.in_(
+                 select(MessageHide.message_id).where(MessageHide.user_id == current_user.id)
+             )
+         )
         .order_by(Message.created_at.desc())
         .limit(limit + 1)   # fetch one extra to know if there's a next page
     )
@@ -239,3 +244,32 @@ async def list_messages(
         messages=[MessagePublic.model_validate(m) for m in reversed(messages)],
         next_cursor=next_cursor,
     )
+
+
+async def delete_message(
+     message_id: UUID,
+     current_user: User,
+     session: AsyncSession,
+ ) -> None:
+     msg = await session.get(Message, message_id)
+     if not msg or msg.sender_id != current_user.id:
+         raise HTTPException(status_code=403, detail="Cannot delete this message")
+     channel_id = str(msg.channel_id)
+     await session.delete(msg)
+     await session.commit()
+     await manager.broadcast(channel_id, {
+         "type": "message_deleted",
+         "message_id": str(message_id),
+     })
+ 
+ 
+async def hide_message(
+     message_id: UUID,
+     current_user: User,
+     session: AsyncSession,
+ ) -> None:
+     existing = await session.get(MessageHide, (current_user.id, message_id))
+     if not existing:
+         session.add(MessageHide(user_id=current_user.id, message_id=message_id))
+         await session.commit()
+
