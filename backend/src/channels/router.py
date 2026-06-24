@@ -99,6 +99,7 @@ async def channel_websocket(
     token: str,
     ws: WebSocket,
 ) -> None:
+    import json
     from src.auth.utils import decode_access_token
 
     payload = decode_access_token(token)
@@ -109,6 +110,13 @@ async def channel_websocket(
     await manager.connect(str(channel_id), ws)
     try:
         while True:
-            await ws.receive_text()
+            data = await ws.receive_text()
+            try:
+                event = json.loads(data)
+                if event.get("type") == "typing":
+                    await manager.broadcast_others(str(channel_id), ws, event)
+            except (ValueError, KeyError):
+                pass
     except WebSocketDisconnect:
         manager.disconnect(str(channel_id), ws)
+

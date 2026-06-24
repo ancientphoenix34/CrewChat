@@ -17,5 +17,11 @@ class ConnectionManager:
         for ws in list(self._connections[channel_id]):
             await ws.send_json(message)
 
+    async def broadcast_others(self, channel_id: str, sender: WebSocket, message: dict) -> None:
+        for ws in list(self._connections[channel_id]):
+            if ws is not sender:
+                await ws.send_json(message)
+
 
 manager = ConnectionManager()
+
