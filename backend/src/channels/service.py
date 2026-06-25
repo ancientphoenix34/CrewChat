@@ -8,7 +8,7 @@ import base64
 
 from src.auth.models import OrganizationMember, User
 from src.channels.models import Channel, ChannelLastRead, ChannelMember, Message, MessageHide
-from src.channels.schemas import ChannelListResponse, ChannelPublic, CreateChannelRequest, MessageListResponse, MessagePublic, SendMessageRequest
+from src.channels.schemas import ChannelListResponse, ChannelPublic, CreateChannelRequest, MessageListResponse, MessagePublic, SendMessageRequest, EditMessageRequest
 from src.channels.ws import manager
 
 
@@ -261,6 +261,27 @@ async def delete_message(
          "type": "message_deleted",
          "message_id": str(message_id),
      })
+
+
+async def edit_message(
+     message_id: UUID,
+     data: EditMessageRequest,
+     current_user: User,
+     session: AsyncSession,
+ ) -> MessagePublic:
+     msg = await session.get(Message, message_id)
+     if not msg or msg.sender_id != current_user.id:
+         raise HTTPException(status_code=403, detail="Cannot edit this message")
+     msg.content = data.content
+     session.add(msg)
+     await session.commit()
+     await manager.broadcast(str(msg.channel_id), {
+         "type": "message_edited",
+         "message_id": str(message_id),
+         "content": data.content,
+     })
+     return MessagePublic.model_validate(msg)
+
  
  
 async def hide_message(

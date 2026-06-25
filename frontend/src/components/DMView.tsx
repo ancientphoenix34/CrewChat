@@ -50,12 +50,14 @@ export default function DMView() {
   const token = useAuthStore((s) => s.token)
   const currentUserId = useAuthStore((s) => s.user?.id)
   const currentUserName = useAuthStore((s) => s.user?.display_name)
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [editContent, setEditContent] = useState('')
 
   useEffect(() => {
     if (!conversationId) return
     setMessages([])
     setIsTyping(false)
-    api.patch(`/dms/${conversationId}/read`).catch(() => {})
+    api.patch(`/dms/${conversationId}/read`).catch(() => { })
     api.get(`/dms/${conversationId}/messages`).then(r => setMessages(r.data.messages))
   }, [conversationId])
 
@@ -72,6 +74,12 @@ export default function DMView() {
       }
       if (event.type === 'message_deleted') {
         setMessages(prev => prev.filter(m => m.id !== event.message_id))
+        return
+      }
+      if (event.type === 'message_edited') {
+        setMessages(prev =>
+          prev.map(m => m.id === event.message_id ? { ...m, content: event.content } : m)
+        )
         return
       }
       const msg: DirectMessage = event
@@ -131,6 +139,13 @@ export default function DMView() {
     setMessages(prev => prev.filter(m => m.id !== messageId))
   }
 
+  async function handleSaveEdit(messageId: string) {
+    if (!editContent.trim()) return
+    await api.patch(`/dms/${conversationId}/messages/${messageId}`, { content: editContent.trim() })
+    setEditingId(null)
+  }
+
+
   function formatTime(iso: string) {
     return new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
   }
@@ -178,13 +193,31 @@ export default function DMView() {
                       </span>
                       <span className="text-xs text-gray-400">{formatTime(msg.created_at)}</span>
                     </div>
-                    <div className={`px-3 py-2 rounded-2xl text-sm break-words ${
-                      isOwn
-                        ? 'bg-purple-600 text-white rounded-tr-sm'
-                        : 'bg-gray-100 text-gray-800 rounded-tl-sm'
-                    }`}>
-                      {msg.content}
-                    </div>
+                    {editingId === msg.id ? (
+                      <div className="flex flex-col gap-1 w-full">
+                        <input
+                          autoFocus
+                          value={editContent}
+                          onChange={e => setEditContent(e.target.value)}
+                          onKeyDown={e => {
+                            if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSaveEdit(msg.id) }
+                            if (e.key === 'Escape') setEditingId(null)
+                          }}
+                          className="border border-purple-400 rounded px-2 py-1 text-sm outline-none focus:ring-2 focus:ring-purple-400"
+                        />
+                        <div className="flex gap-2 text-xs">
+                          <button onClick={() => handleSaveEdit(msg.id)} className="text-purple-600 hover:underline">Save</button>
+                          <button onClick={() => setEditingId(null)} className="text-gray-400 hover:underline">Cancel</button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className={`px-3 py-2 rounded-2xl text-sm break-words ${isOwn
+                          ? 'bg-purple-600 text-white rounded-tr-sm'
+                          : 'bg-gray-100 text-gray-800 rounded-tl-sm'
+                        }`}>
+                        {msg.content}
+                      </div>
+                    )}
                   </div>
                   <div className={`self-center opacity-0 group-hover:opacity-100 transition-opacity ${isOwn ? 'mr-1' : 'ml-1'}`}>
                     <button
@@ -195,6 +228,14 @@ export default function DMView() {
                     </button>
                     {menuOpen === msg.id && (
                       <div className={`absolute top-0 bg-white shadow-lg rounded-lg py-1 z-10 min-w-[170px] border border-gray-100 ${isOwn ? 'right-10' : 'left-10'}`}>
+                        {isOwn && (
+                          <button
+                            onClick={() => { setEditingId(msg.id); setEditContent(msg.content); setMenuOpen(null) }}
+                            className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                          >
+                            Edit
+                          </button>
+                        )}
                         <button
                           onClick={() => handleHide(msg.id)}
                           className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"

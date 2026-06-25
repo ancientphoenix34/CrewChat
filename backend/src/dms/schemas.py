@@ -47,3 +47,15 @@ class ConversationWithUser(SQLModel):
  
 class ConversationListResponse(SQLModel):
      conversations: list[ConversationWithUser]
+
+
+class EditDMRequest(SQLModel):
+     content: str
+ 
+     @field_validator("content")
+     @classmethod
+     def content_not_empty(cls, v: str) -> str:
+         v = v.strip()
+         if not v:
+             raise ValueError("Message cannot be empty")
+         return v

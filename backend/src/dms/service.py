@@ -10,7 +10,7 @@ from sqlalchemy import func
 from src.auth.models import OrganizationMember, User
 from src.dms.models import Conversation, DirectMessage, DMLastRead, DMMessageHide
 from src.dms.schemas import (ConversationListResponse, ConversationPublic, ConversationWithUser,
-     DMListResponse, DirectMessagePublic, SendDMRequest,
+     DMListResponse, DirectMessagePublic, SendDMRequest, EditDMRequest
  )
 
 
@@ -205,4 +205,27 @@ async def hide_dm_message(
      if not existing:
          session.add(DMMessageHide(user_id=current_user.id, message_id=message_id))
          await session.commit()
+
+
+async def edit_dm_message(
+     conversation_id: UUID,
+     message_id: UUID,
+     data: EditDMRequest,
+     current_user: User,
+     session: AsyncSession,
+ ) -> DirectMessagePublic:
+     msg = await session.get(DirectMessage, message_id)
+     if not msg or msg.sender_id != current_user.id or msg.conversation_id != conversation_id:
+         raise HTTPException(status_code=403, detail="Cannot edit this message")
+     msg.content = data.content
+     session.add(msg)
+     await session.commit()
+     from src.channels.ws import manager
+     await manager.broadcast(str(conversation_id), {
+         "type": "message_edited",
+         "message_id": str(message_id),
+         "content": data.content,
+     })
+     return DirectMessagePublic.model_validate(msg)
+
 

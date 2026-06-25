@@ -55,6 +55,8 @@ export default function ChannelView() {
   const currentUserName = useAuthStore((s) => s.user?.display_name)
   const [memberMap, setMemberMap] = useState<Record<string, string>>({})
   const [menuOpen, setMenuOpen] = useState<string | null>(null)
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [editContent, setEditContent] = useState('')
 
   useEffect(() => {
     if (!channelId) return
@@ -89,6 +91,12 @@ export default function ChannelView() {
       }
       if (event.type === 'message_deleted') {
         setMessages(prev => prev.filter(m => m.id !== event.message_id))
+        return
+      }
+      if (event.type === 'message_edited') {
+        setMessages(prev =>
+          prev.map(m => m.id === event.message_id ? { ...m, content: event.content } : m)
+        )
         return
       }
       const msg: Message = event
@@ -148,6 +156,11 @@ export default function ChannelView() {
     setMessages(prev => prev.filter(m => m.id !== messageId))
   }
 
+  async function handleSaveEdit(messageId: string) {
+    if (!editContent.trim()) return
+    await api.patch(`/channels/${channelId}/messages/${messageId}`, { content: editContent.trim() })
+    setEditingId(null)
+  }
 
   function formatTime(iso: string) {
     return new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
@@ -196,7 +209,26 @@ export default function ChannelView() {
                       </span>
                       <span className="text-xs text-gray-400">{formatTime(msg.created_at)}</span>
                     </div>
-                    <p className="text-sm text-gray-700 break-words">{msg.content}</p>
+                    {editingId === msg.id ? (
+                      <div className="flex flex-col gap-1 w-full">
+                        <input
+                          autoFocus
+                          value={editContent}
+                          onChange={e => setEditContent(e.target.value)}
+                          onKeyDown={e => {
+                            if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSaveEdit(msg.id) }
+                            if (e.key === 'Escape') setEditingId(null)
+                          }}
+                          className="border border-purple-400 rounded px-2 py-1 text-sm outline-none focus:ring-2 focus:ring-purple-400 w-full"
+                        />
+                        <div className="flex gap-2 text-xs">
+                          <button onClick={() => handleSaveEdit(msg.id)} className="text-purple-600 hover:underline">Save</button>
+                          <button onClick={() => setEditingId(null)} className="text-gray-400 hover:underline">Cancel</button>
+                        </div>
+                      </div>
+                    ) : (
+                      <p className="text-sm text-gray-700 break-words">{msg.content}</p>
+                    )}
                   </div>
                   <div className="absolute right-0 top-0 opacity-0 group-hover:opacity-100 transition-opacity">
                     <button
@@ -205,6 +237,15 @@ export default function ChannelView() {
                     >
                       ⋯
                     </button>
+                    {isOwn && (
+                      <button
+                        onClick={() => { setEditingId(msg.id); setEditContent(msg.content); setMenuOpen(null) }}
+                        className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                      >
+                        Edit
+                      </button>
+                    )}
+
                     {menuOpen === msg.id && (
                       <div className="absolute right-0 top-6 bg-white shadow-lg rounded-lg py-1 z-10 min-w-[170px] border border-gray-100">
                         <button

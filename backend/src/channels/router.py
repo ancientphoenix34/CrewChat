@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.auth.dependencies import get_current_user, require_org_role
 from src.auth.models import OrgRole, OrganizationMember, User
 from src.channels import service
-from src.channels.schemas import ChannelListResponse, ChannelPublic, CreateChannelRequest, MessageListResponse, MessagePublic, SendMessageRequest
+from src.channels.schemas import ChannelListResponse, ChannelPublic, CreateChannelRequest, MessageListResponse, MessagePublic, SendMessageRequest, SendMessageRequest, EditMessageRequest
 from src.core.database import get_session
 from src.channels.ws import manager
 
@@ -139,5 +139,18 @@ async def hide_message(
      session: AsyncSession = Depends(get_session),
  ) -> None:
      await service.hide_message(message_id, current_user, session)
+
+
+
+@router.patch("/{channel_id}/messages/{message_id}", response_model=MessagePublic)
+async def edit_message(
+     channel_id: UUID,
+     message_id: UUID,
+     data: EditMessageRequest,
+     current_user: User = Depends(get_current_user),
+     session: AsyncSession = Depends(get_session),
+ ) -> MessagePublic:
+     return await service.edit_message(message_id, data, current_user, session)
+
 
 

@@ -8,7 +8,7 @@ from src.auth.models import OrgRole, OrganizationMember, User
 from src.channels.ws import manager
 from src.core.database import get_session
 from src.dms import service
-from src.dms.schemas import ConversationPublic, DMListResponse, DirectMessagePublic, SendDMRequest, ConversationPublic, ConversationListResponse
+from src.dms.schemas import ConversationPublic, DMListResponse, DirectMessagePublic, SendDMRequest, ConversationPublic, ConversationListResponse, EditDMRequest
 
 router = APIRouter(prefix="/dms", tags=["dms"])
 
@@ -109,3 +109,15 @@ async def hide_dm_message(
      session: AsyncSession = Depends(get_session),
  ) -> None:
      await service.hide_dm_message(message_id, current_user, session)
+
+
+@router.patch("/{conversation_id}/messages/{message_id}", response_model=DirectMessagePublic)
+async def edit_dm_message(
+     conversation_id: UUID,
+     message_id: UUID,
+     data: EditDMRequest,
+     current_user: User = Depends(get_current_user),
+     session: AsyncSession = Depends(get_session),
+ ) -> DirectMessagePublic:
+     return await service.edit_dm_message(conversation_id, message_id, data, current_user, session)
+

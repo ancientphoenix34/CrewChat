@@ -64,3 +64,15 @@ class MessageListResponse(SQLModel):
     messages: list[MessagePublic]
     next_cursor: str | None  # for pagination
 
+
+class EditMessageRequest(SQLModel):
+     content: str
+ 
+     @field_validator("content")
+     @classmethod
+     def content_not_empty(cls, v: str) -> str:
+         v = v.strip()
+         if not v:
+             raise ValueError("Message content cannot be empty")
+         return v
+
